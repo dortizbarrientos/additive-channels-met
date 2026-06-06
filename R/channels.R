@@ -79,3 +79,61 @@ simulate_eiv <- function(n, G, b0, bu, H0, Hu, rho) {
        alpha = rn_coeff(Z, b0, H0), theta = rn_coeff(Z, bu, Hu),
        PEV = (1 - rho) * G)
 }
+
+## ---------------------------------------------------------------------------
+## Additions for the transfer-accuracy experiment (scripts/03).
+## ---------------------------------------------------------------------------
+
+## Local channel quantities at environment coordinate u (reference u0 = 0):
+##   b(u)=b0+u*bu, H(u)=H0+u*Hu, and Ag(u)=Vlin(u)/(Vlin(u)+Vquad(u)).
+local_channels <- function(u, G, b0, bu, H0, Hu) {
+  b <- b0 + u * bu
+  H <- H0 + u * Hu
+  Vlin  <- as.numeric(t(b) %*% G %*% b)
+  Vquad <- 0.5 * trace_sq(H %*% G)
+  list(Vlin = Vlin, Vquad = Vquad, c = Vlin + Vquad, Ag = Vlin / (Vlin + Vquad))
+}
+
+## Build (bu, Hu) giving a target GEI additivity index AgGEI at a target total
+## GEI variance c11, holding the bu direction (dir_bu) and using isotropic Hu.
+##   bu' G bu = AgGEI*c11 ;  0.5 tr[(Hu G)^2] = (1-AgGEI)*c11
+make_gei <- function(AgGEI, c11, G, dir_bu = c(1, 0)) {
+  Vlin  <- AgGEI * c11
+  Vquad <- (1 - AgGEI) * c11
+  d  <- dir_bu / sqrt(as.numeric(t(dir_bu) %*% G %*% dir_bu))   # unit in G-metric
+  bu <- d * sqrt(Vlin)
+  h  <- sqrt(2 * Vquad / trace_sq(G))
+  list(bu = bu, Hu = h * diag(nrow(G)))
+}
+
+## Additive reaction-norm transfer accuracy to a held-out environment u_t.
+## Trains the additive (linear-in-z) intercept and slope maps, predicts the TRUE
+## genetic value at u_t, and returns Pearson and Spearman transfer accuracy plus
+## the local additivity Ag(u_t).  In the noise-free large-n limit the additive
+## reaction-norm fit is fold-invariant, so leave-one-environment-out transfer to
+## u_t reduces to transfer accuracy to u_t.
+transfer_accuracy <- function(n, G, b0, bu, H0, Hu, ut) {
+  Z     <- rmvn(n, G)
+  alpha <- rn_coeff(Z, b0, H0)
+  theta <- rn_coeff(Z, bu, Hu)
+  Vz    <- cov(Z)
+  bhat0 <- solve(Vz, as.numeric(cov(Z, alpha)))   # additive intercept map
+  bhatu <- solve(Vz, as.numeric(cov(Z, theta)))   # additive slope map
+  ghat  <- as.vector(Z %*% (bhat0 + ut * bhatu))  # additive prediction at u_t
+  gtrue <- alpha + ut * theta                     # true genetic value at u_t
+  c(pearson  = cor(ghat, gtrue),
+    spearman = cor(ghat, gtrue, method = "spearman"),
+    Ag_ut    = local_channels(ut, G, b0, bu, H0, Hu)$Ag)
+}
+
+## Environmental rate signal: the rate of change of logit-additivity as the
+## target environment drifts at rate udot.  sign(r_env) = sign(d Ag/du).
+## r_env < 0 means the additive-prediction channel is ERODING -- future transfer
+## will decline -- even when present additivity Ag(u0) still looks healthy.
+## It uses only currently estimable quantities (the local gradient/curvature
+## sensitivities the current MET provides), so it forecasts before the drift.
+r_env <- function(udot, G, b0, bu, H0, Hu) {
+  tc <- true_channels(G, b0, bu, H0, Hu)
+  udot * (2 * tc$c10L / (tc$c00 * tc$Ag) -
+          2 * tc$c10Q / (tc$c00 * (1 - tc$Ag)))
+}

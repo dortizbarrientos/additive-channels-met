@@ -67,14 +67,79 @@ against `verify/verify_numpy.py`):
 
 Naive tracks `rho * truth`; corrected lands on the truth at every reliability.
 
+## Does the diagnostic predict transfer? (scripts/03)
+
+For an additive reaction-norm predictor (one that tracks the slope but, being
+linear in breeding values, cannot see curvature), three results hold:
+
+1. **Accuracy is the square root of additivity.** Transfer Pearson accuracy to a
+   held-out environment satisfies `Pearson(u_t)^2 = Ag(u_t)` exactly -- the
+   additivity index is not merely correlated with transfer, it equals it.
+2. **Transfer to a shifted environment rises with `AgGEI`.** At a far target
+   (`u_t = 1`), accuracy climbs from ~0.74 to ~0.90 (Pearson) and ~0.77 to ~0.95
+   (Spearman) as `AgGEI` goes 0.1 -> 0.9.
+3. **The Pearson/Spearman gap is itself a failure-mode flag.** When additivity
+   is high, ranks are robust and `Spearman >= Pearson` (curvature acts as skewed
+   noise). When curvature dominates (`Ag(u_t)` small), ranks reverse and
+   `Spearman < Pearson`. The sign of the gap flips near `Ag(u_t) ~ 0.4`.
+
+So curvature always erodes transfer, but it induces genuine *rank reversals*
+only once it dominates the local linear signal -- a sharper claim than
+"curvature breaks ranking."
+
+## Early warning: does r_env fire before failure? (scripts/04)
+
+The environmental rate signal `r_env` is the rate of change of logit-additivity
+as the target environment drifts; its sign is the sign of `d Ag/du`, and it is
+computed from quantities the current MET already estimates. Three results:
+
+1. **It is the additivity rate.** `r_env` matches the finite-difference rate of
+   `log(Vlin/Vquad)` to four decimals -- a validation of the manuscript formula.
+2. **Same present, different futures.** Scenarios with identical present
+   reliability `Ag(u0)` (so current cross-validation cannot tell them apart) but
+   different `r_env` diverge exactly as the sign predicts: drifting to `u=1`,
+   accuracy goes 0.46 (eroding), 0.88 (stable), 0.98 (deepening) from a common
+   0.87.
+3. **It is an early warning.** In the eroding case (gradient collapsing toward an
+   optimum, curvature growing) `r_env < 0` fires while accuracy is still 0.87;
+   accuracy only crosses 0.70 after the target has drifted ~0.5 units. That gap
+   is the lead time the diagnostic buys.
+
+## Program simulation: the null engine (R/engine.R, scripts/05)
+
+Before layering any additive-channel logic onto selection decisions, the
+recurrent-selection engine must reproduce textbook results on a flat-linear
+surface (constant selection direction, no curvature). It clears four gates:
+
+1. **Breeder's equation** -- realized response equals `i * G b / sqrt(b' G b)`.
+2. **Bulmer effect** -- the index variance `b' G b` declines under truncation
+   selection to the closed-form equilibrium `b' Ga b / (1 + k)`,
+   `k = i(i - x)`, regenerated each cycle by Mendelian sampling (not to zero).
+3. **Truncation intensity** -- realized intensity equals `dnorm(x)/prop`.
+4. **No spurious plateau** -- once variance equilibrates, per-cycle gain is
+   steady at `i*sqrt(v_eq)`; the engine does not manufacture a stall absent
+   curvature.
+
+Only after this null passes do the curvature surface and the channel-guided
+selection/crossing protocol (P1 vs P2) get built on top -- so that any later
+plateau or transfer failure is attributable to curvature, not to the engine.
+
 ## Layout
 
 ```
 R/channels.R               core functions (truth, simulators, estimators)
 scripts/01_lane_a_recovery.R   recover Ag, AgGEI, c-coefficients; rank-2 check
 scripts/02_eiv_correction.R    attenuation vs reliability + correction + figure
+scripts/03_transfer_accuracy.R does AgGEI predict transfer? (Pearson vs Spearman)
+scripts/04_temporal_warning.R  does r_env anticipate transfer loss before it bites?
+R/engine.R                     infinitesimal-model recurrent-selection engine
+scripts/05_null_recurrent_selection.R  NULL gate: recover textbook recurrent selection
+tests/test_engine.R            the four null gates as assertions
 tests/test_channels.R          algebraic + recovery checks (assertions)
-verify/verify_numpy.py         independent numpy implementation (cross-check)
+verify/verify_numpy.py         independent numpy cross-check (recovery + EIV)
+verify/verify_q3_numpy.py      independent numpy cross-check (transfer accuracy)
+verify/verify_q4_numpy.py      independent numpy cross-check (temporal warning)
+verify/verify_engine_numpy.py  independent numpy cross-check (null engine)
 figures/                       output (created on run)
 ```
 
@@ -83,6 +148,10 @@ figures/                       output (created on run)
 ```bash
 Rscript scripts/01_lane_a_recovery.R
 Rscript scripts/02_eiv_correction.R     # writes figures/eiv_attenuation.png
+Rscript scripts/03_transfer_accuracy.R  # writes figures/transfer_accuracy.png
+Rscript scripts/04_temporal_warning.R   # writes figures/temporal_warning.png
+Rscript scripts/05_null_recurrent_selection.R  # NULL gate; writes figures/null_recurrent_selection.png
+Rscript tests/test_engine.R             # the four null gates as assertions
 Rscript tests/test_channels.R
 python3 verify/verify_numpy.py          # optional independent cross-check
 ```

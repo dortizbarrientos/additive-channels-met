@@ -39,3 +39,30 @@ ok(abs(mean(an) - rho * tr$AgGEI) < 0.01,            "naive ~ rho*truth at rho=0
 ok(abs(mean(ac) - tr$AgGEI)       < 0.01,            "corrected ~ truth at rho=0.5")
 
 cat("\nAll checks passed.\n")
+
+## ---- transfer-accuracy additions (scripts/03) ----
+ok(abs(local_channels(0, G, b0, bu, H0, Hu)$Ag - tr$Ag) < 1e-12,
+   "local_channels at u=0 equals reference Ag")
+
+g <- make_gei(0.6, 0.5, G, dir_bu = c(0.45, 0.25))
+ok(abs(as.numeric(t(g$bu) %*% G %*% g$bu) - 0.6 * 0.5) < 1e-10,
+   "make_gei: bu' G bu == AgGEI * c11")
+ok(abs(0.5 * trace_sq(g$Hu %*% G) - 0.4 * 0.5) < 1e-10,
+   "make_gei: 0.5 tr[(Hu G)^2] == (1-AgGEI) * c11")
+
+rr <- transfer_accuracy(300000, G, b0, g$bu, H0, g$Hu, 1.0)
+ok(abs(rr[["pearson"]]^2 - rr[["Ag_ut"]]) < 0.01,
+   "transfer Pearson^2 == Ag(u_t) within 0.01")
+
+cat("\nAll transfer checks passed.\n")
+
+## ---- environmental rate signal (scripts/04) ----
+lam_u <- function(u, bu, Hu) { lc <- local_channels(u, G, b0, bu, H0, Hu); log(lc$Vlin) - log(lc$Vquad) }
+bu_e <- -0.5 * b0; Hu_e <- 0.5 * diag(2)
+fd_e <- (lam_u(1e-4, bu_e, Hu_e) - lam_u(-1e-4, bu_e, Hu_e)) / (2e-4)
+ok(abs(r_env(1, G, b0, bu_e, H0, Hu_e) - fd_e) < 1e-4,
+   "r_env equals logit-additivity finite-difference rate")
+ok(r_env(1, G, b0, -0.5 * b0, H0, 0.5 * diag(2)) < 0 &&
+   r_env(1, G, b0,  0.5 * b0, H0, -0.3 * diag(2)) > 0,
+   "r_env sign: eroding < 0, deepening > 0")
+cat("\nAll temporal checks passed.\n")

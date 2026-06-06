@@ -1,0 +1,26 @@
+{
+    "id": "90418FF8",
+    "path": "~/repos/additive-channels-met/tests/test_channels.R",
+    "project_path": "tests/test_channels.R",
+    "type": "r_source",
+    "hash": "2759041244",
+    "contents": "",
+    "dirty": false,
+    "created": 1780755340160.0,
+    "source_on_save": false,
+    "relative_order": 4,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "57,0",
+        "scrollLine": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1780758760,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1780758760,
+    "read_only": false,
+    "read_only_alternatives": []
+}
