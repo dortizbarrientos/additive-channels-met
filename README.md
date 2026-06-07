@@ -124,6 +124,32 @@ Only after this null passes do the curvature surface and the channel-guided
 selection/crossing protocol (P1 vs P2) get built on top -- so that any later
 plateau or transfer failure is attributable to curvature, not to the engine.
 
+## Program simulation: the curvature trap (R/engine.R, scripts/06)
+
+With the null cleared, the engine's selection direction is set each cycle to the
+local gradient of a log-performance surface (the genetics are unchanged -- this
+is standard truncation selection following local additive merit, i.e. steepest
+ascent). On a surface with a tempting curved near peak and a better far peak, a
+naive breeder climbs the near peak and stalls. Three signatures appear -- and
+none of them appear on a genuine linear surface, which is the non-circularity
+guarantee that the pathology is curvature, not the engine:
+
+1. **Performance plateaus** below the far peak (the breeder is trapped at a
+   local optimum it cannot leave by local ascent).
+2. **A_g crashes** as the mean enters the curved peak region. This is the
+   diagnostic payload: a response curve alone cannot tell a curvature trap from
+   benign variance exhaustion, but A_g can -- it falls only when curvature, not
+   data scarcity, is the cause.
+3. **The breeder's equation de-calibrates**: cumulative first-order (tangent)
+   predicted gain increasingly exceeds realized gain. Because truncation
+   selection is direction-based, the breeder keeps spending its full selection
+   differential even as the gradient flattens, so realized performance gain
+   falls short of what the linear model promised.
+
+This is the disease. The cure -- a channel-guided protocol that uses the
+diagnostic to redirect crossing toward the better peak, and the P1-vs-P2
+contrast across a selection x crossing grid -- is the next build.
+
 ## Layout
 
 ```
@@ -134,12 +160,14 @@ scripts/03_transfer_accuracy.R does AgGEI predict transfer? (Pearson vs Spearman
 scripts/04_temporal_warning.R  does r_env anticipate transfer loss before it bites?
 R/engine.R                     infinitesimal-model recurrent-selection engine
 scripts/05_null_recurrent_selection.R  NULL gate: recover textbook recurrent selection
-tests/test_engine.R            the four null gates as assertions
+scripts/06_curvature_trap.R    the curvature trap: naive breeder stalls
+tests/test_engine.R            null gates + curvature-trap assertions
 tests/test_channels.R          algebraic + recovery checks (assertions)
 verify/verify_numpy.py         independent numpy cross-check (recovery + EIV)
 verify/verify_q3_numpy.py      independent numpy cross-check (transfer accuracy)
 verify/verify_q4_numpy.py      independent numpy cross-check (temporal warning)
 verify/verify_engine_numpy.py  independent numpy cross-check (null engine)
+verify/verify_trap_numpy.py    independent numpy cross-check (curvature trap)
 figures/                       output (created on run)
 ```
 
@@ -151,7 +179,8 @@ Rscript scripts/02_eiv_correction.R     # writes figures/eiv_attenuation.png
 Rscript scripts/03_transfer_accuracy.R  # writes figures/transfer_accuracy.png
 Rscript scripts/04_temporal_warning.R   # writes figures/temporal_warning.png
 Rscript scripts/05_null_recurrent_selection.R  # NULL gate; writes figures/null_recurrent_selection.png
-Rscript tests/test_engine.R             # the four null gates as assertions
+Rscript scripts/06_curvature_trap.R     # the curvature trap; writes figures/curvature_trap.png
+Rscript tests/test_engine.R             # null gates + curvature-trap assertions
 Rscript tests/test_channels.R
 python3 verify/verify_numpy.py          # optional independent cross-check
 ```
